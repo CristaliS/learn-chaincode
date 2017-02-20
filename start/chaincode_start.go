@@ -23,52 +23,107 @@ import (
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
-// SimpleChaincode example simple Chaincode implementation
-type SimpleChaincode struct {
+// TrueCodeMarkChainCode example simple Chaincode implementation
+type TrueCodeMarkChainCode struct {
 }
 
 // ============================================================================================================================
 // Main
 // ============================================================================================================================
 func main() {
-	err := shim.Start(new(SimpleChaincode))
+	err := shim.Start(new(TrueCodeMarkChainCode))
 	if err != nil {
-		fmt.Printf("Error starting Simple chaincode: %s", err)
+		fmt.Printf("Error starting TrueCode Mark chaincode: %s", err)
 	}
 }
 
 // Init resets all the things
-func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-	if len(args) != 1 {
-		return nil, errors.New("Incorrect number of arguments. Expecting 1")
+func (t *TrueCodeMarkChainCode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2")
+	}
+
+	err1 := stub.PutState("manufacturer", []byte(args[0]))
+
+	if err1 != nil {
+		return nil, err1
+	}
+
+	err2 := stub.PutState("meta", []byte(args[1]))
+
+	if err2 != nil {
+		return nil, err2
 	}
 
 	return nil, nil
 }
 
 // Invoke is our entry point to invoke a chaincode function
-func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+func (t *TrueCodeMarkChainCode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Println("invoke is running " + function)
 
 	// Handle different functions
-	if function == "init" {													//initialize the chaincode state, used as reset
+	if function == "init" {
 		return t.Init(stub, "init", args)
+	} else if function == "write" {
+		return t.Write(stub, args)
 	}
-	fmt.Println("invoke did not find func: " + function)					//error
+	fmt.Println("invoke did not find func: " + function)
 
 	return nil, errors.New("Received unknown function invocation: " + function)
 }
 
+func (t *TrueCodeMarkChainCode) Write(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	var key, value string
+	var err error
+	fmt.Println("running write()")
+
+	if len(args) != 4 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2. name of the key and value to set")
+	}
+
+	key = args[0] //rename for fun
+	value = args[1]
+	err = stub.PutState(key, []byte(value)) //write the variable into the chaincode state
+	if err != nil {
+		return nil, err
+	}
+	key = args[2]
+	value = args[3]
+	err = stub.PutState(key, []byte(value)) //write the variable into the chaincode state
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
 // Query is our entry point for queries
-func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+func (t *TrueCodeMarkChainCode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Println("query is running " + function)
 
 	// Handle different functions
-	if function == "dummy_query" {											//read a variable
-		fmt.Println("hi there " + function)						//error
-		return nil, nil;
+	if function == "read" { //read a variable
+		return t.Read(stub, args)
 	}
-	fmt.Println("query did not find func: " + function)						//error
+	fmt.Println("query did not find func: " + function)
 
 	return nil, errors.New("Received unknown function query: " + function)
+}
+
+func (t *TrueCodeMarkChainCode) Read(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	var key, jsonResp string
+	var err error
+
+	if len(args) != 1 {
+		return nil, errors.New("Incorrect number of arguments. Expecting name of the key to query")
+	}
+
+	key = args[0]
+	valAsbytes, err := stub.GetState(key)
+	if err != nil {
+		jsonResp = "{\"Error\":\"Failed to get state for " + key + "\"}"
+		return nil, errors.New(jsonResp)
+	}
+
+	return valAsbytes, nil
 }
